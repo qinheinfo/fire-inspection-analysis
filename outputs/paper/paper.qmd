@@ -1,0 +1,121 @@
+---
+title: "An analysis of Highrise Residential Fire Inspection"
+author: "Qin He"
+thanks: "Code and data from this analysis are avaliable at: https://open.toronto.ca/dataset/highrise-residential-fire-inspection-results/"
+date: "`r Sys.time()`"
+date-format: "D MMMM YYYY"
+abstract: "This paper analyzes Toronto Fire Services' fire inspection dataset from OpenDataToronto [@Fire-Inspection-Results], examining properties with and without Fire Code violations. The structured sections cover data details, trend results, critical discussion, and a brief conclusion summarizing key findings and their implications for public safety."
+format: pdf
+toc: true
+number-sections: true
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(knitr)
+library(janitor)
+library(lubridate)
+library(opendatatoronto)
+library(tidyverse)
+library(tidyr)
+library(data.table)
+library(dplyr)
+library(kableExtra)
+library(palmerpenguins)
+```
+
+# introduction
+
+Fire plays a dual role in our lives---both as a service and a potential threat. Toronto Fire Services employs fire prevention and enforcement strategies to enhance public safety and awareness. Governed by the Fire Protection and Prevention Act, 1997 (FPPA) and its regulations, such as the Ontario Fire Code, routine inspections are conducted for specific occupancy types or in response to requests and complaints.
+
+The dataset I used Indicates records of properties where violations have been found by an Inspector which are required to be fixed for compliance at the time with the Ontario Fire Code as well as properties with no observable violations. This dataset only includes 'Closed' Cases indicating that the inspection process has ended. [@Fire-Inspection-Results]
+
+To examine the data, I used a program called R [@citeR] and several helpful packages like tidyverse [@tidyverse], opendatatoronto [@opendatatoronto], and gitcreds [@gitcreds]. Tables in this report were made with kableExtra [@kableExtra], and figures were created using ggplot2, which is included in tidyverse [@tidyverse]. This paper is organized into sections—Data, Results, Discussion, and Conclusion—to explore the frequency and trends in fire inspection outcomes. The Data section explains the nature of the spreadsheet obtained from OpenDataToronto [@rOpenDataToronto] and details the steps taken to clean and analyze the information. The Results section highlights the trends uncovered, and the Discussion section critically examines these patterns, offering additional insights. Finally, the Conclusion section sums up the main findings discussed in this paper.
+
+# Data
+```{r include=FALSE}
+library(data.table)
+library(here)
+
+c_data <- read_csv(file=here("outputs/data/analysis_data.csv"))
+```
+
+## Data Source
+This report examines Highrise Residential Fire Inspection Results from January 2017 to January 2024. This inspection data is published by the Toronto Fire Services, Toronto Fire Services is the City’s only all hazards emergency response organization. Fire Services provides Toronto residents, visitors and businesses with protection against loss of life, property and the environment from the effects of fire, illness, accidents, and all other hazards through preparedness, prevention, public education, and emergency response, with an emphasis on quality services, efficiency, effectiveness, and safety. [@torontoFireService] This dataset was last updated in 2024-01-20, and the `R` package `opendatatoronto` [@rOpenDataToronto] was used to obtain all relevant data. 
+
+
+## Methodology and Data Collection
+The original data covers all Highrise Residential Fire Inspection Results since 2017, Inspections that have commenced and are ongoing will not be available in the dataset until all related processes have ended. Any buildings that have an immediate threat to occupant or firefighter safety are required to implement temporary measures until Fire Code violations are corrected. Each inspection with the following features: Unique row identifiere, Address of inspected property, Address name, Enforcement proceedings, PropertyType, propertyWard, inspectio date, Fire code, The order number, and Description of fire code, etc.
+
+My workflow began with the `data_cleaning.R` script; data was downloaded using the `opendatatoronto` package and cleaned as follows:
+  - Renaming columns - e.g. “PropertyType” to “PropertyType property”
+  - Group and tally the occurrences of each VIOLATION_DESCRIPTION, save them as raw_data
+  - Select column that I think are relevant and useful: raw_data, ADDRESS_NAME, INSPECTIONS_CLOSEDDATE, VIOLATIONS_ITEM_NUMBER, VIOLATION_DESCRIPTION, save them as cleaned_data.
+  - Arrange them in descending subsequent, filter VIOLATIONS_ITEM_NUMBER > 0, save them as c_data
+
+The outcomes were stored in 'c_data' and imported into '03-test_data.R.' Preliminary analysis uncovered varying frequencies of attributes in the fire inspection, laying the groundwork for more in-depth exploration.
+
+## Data Characteristics
+The initial cleaned dataset shows data associated with each inspection; a initial dataset can be seen in below. This analysis dataset address, opendate, and description data from 77,398 data across 8 years of activity.
+
+```{r}
+#| label: tbl-data-sample
+#| tbl-cap: "The first five rows from the cleaned TTC metro delay data"
+#| echo: false
+#| warning: false
+#| render: asis
+#| 
+c_data |>
+  head(5) |>
+  kable()
+```
+
+# Discussion
+
+
+## Frequency by Address name
+The incidents primarily occur in the areas of Eglinton, Sheppard, and Yonge, as illustrated in Figure 1. Upon further examination of the Registered Residential Condominiums in the City of Toronto for the period 2002 to 2018 [@Toronto-condominiums] in Figure 2, a notable correlation emerged between the distribution of condominiums and the frequency of high-rise violation cases.
+```{r address, fig.cap="Top 10 Address violation cases occurred", echo=FALSE}
+a_data<-
+  group_by(c_data, ADDRESS_NAME) |>
+  summarise(n=n()) |>
+  arrange(-n)
+  
+ggplot(data=head(a_data,10), aes(x=ADDRESS_NAME, y=n)) +
+  geom_bar(stat="identity")
+```
+
+```{r casual, fig.cap=" Registered Condominiums in the City of Toronto", out.width = "100%", fig.show='hold', fig.align='center', echo=FALSE}
+# ![Alt text](inputs/image/Torontocondo.png)
+knitr::include_graphics(here::here("inputs/image/Torontocondo.png"))
+```
+
+## Frequency by Date
+Figure 3 illustrates trends in the occurrence of the ten most frequent violation dates. It is evident that a majority of these violations occur during the Spring and Summer seasons. Notably, the date with the highest frequency is 2018-08-24, witnessing over 55 cases on that particular day.
+```{r figure 3, fig.cap="Top 10 Most frequent violation dates", echo=FALSE}
+i_data <-
+  group_by(c_data, INSPECTIONS_OPENDATE) |>
+  summarise(n=n()) |>
+  arrange(-n)
+ggplot(head(i_data,10), aes(x=factor(INSPECTIONS_OPENDATE), y=n)) +
+  geom_bar(stat="identity")
+```
+
+
+## Frequency by Description
+In Figure 4, four primary reasons were identified as the main causes of violations, with the most significant being the maintenance in closures. Other notable reasons include damaged fire separations and accumulations of combustible materials. Addressing these issues promptly is crucial to prevent potentially severe consequences.
+```{r figure 4, fig.cap="Top 4 resons of violations", echo=FALSE}
+e_data <-
+  group_by(c_data, VIOLATION_DESCRIPTION) |>
+  summarise(n=n()) |>
+  arrange(-n)
+ggplot(data=head(e_data,4), aes(x=VIOLATION_DESCRIPTION, y=n)) +
+  geom_bar(stat="identity")
+```
+
+# Conclusion
+In conclusion, this paper delves into the outcomes of high residential fire inspections in Toronto. The findings highlight specific factors influencing the frequency of violations, and the discussion explores potential relationships between these factors. Moving forward, it is imperative to explore additional factors associated with fire violation cases. Furthermore, acquiring more comparative data and investigating the positive impact of inspections would contribute significantly to the overall understanding and enhancement of fire safety measures.
+
+# Reference
